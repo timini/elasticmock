@@ -211,7 +211,7 @@ class FakeElasticsearch(Elasticsearch):
             raise NotFoundError(404, 'IndexMissingException[[{0}] missing]'.format(index))
 
         result_dict = {}
-        for key, value in body.items():
+        for key, value in list(body.items()):
             text = value.get('text')
             suggestion = int(text) + 1 if isinstance(text, int) else '{0}_suggestion'.format(text)
             result_dict[key] = [
@@ -233,8 +233,8 @@ class FakeElasticsearch(Elasticsearch):
     def _normalize_index_to_list(self, index):
         # Ensure to have a list of index
         if index is None:
-            searchable_indexes = self.__documents_dict.keys()
-        elif isinstance(index, str) or isinstance(index, unicode):
+            searchable_indexes = list(self.__documents_dict.keys())
+        elif isinstance(index, str) or isinstance(index, str):
             searchable_indexes = [index]
         elif isinstance(index, list):
             searchable_indexes = index

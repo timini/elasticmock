@@ -9,11 +9,31 @@ from elasticsearch.exceptions import NotFoundError
 from elasticmock.utilities import get_random_id
 
 
+class FakeIndicesClient(object):
+    def __init__(self, client):
+        self.client = client
+
+    @query_params('allow_no_indices', 'expand_wildcards', 'flat_settings',
+        'ignore_unavailable', 'include_defaults', 'local')
+    def exists(self, index, params=None):
+        if index in self.client._get_documents_dict():
+            return True
+        return False
+
+    @query_params('master_timeout', 'timeout', 'wait_for_active_shards')
+    def create(self, index, body=None, params=None):
+        self.client._get_documents_dict()[index] = []
+
+
 class FakeElasticsearch(Elasticsearch):
     __documents_dict = None
 
     def __init__(self):
+        self.indices = FakeIndicesClient(self)
         self.__documents_dict = {}
+
+    def _get_documents_dict(self):
+        return self.__documents_dict
 
     @query_params()
     def ping(self, params=None):
@@ -56,11 +76,16 @@ class FakeElasticsearch(Elasticsearch):
         })
 
         return {
-            '_type': doc_type,
-            '_id': id,
-            'created': True,
-            '_version': version,
-            '_index': index
+            "_shards" : {
+                "total" : 2,
+                "failed" : 0,
+                "successful" : 2
+            },
+            "_index" : index,
+            "_type" : doc_type,
+            "_id" : id,
+            "_version" : version,
+            "result" : "created"
         }
 
     @query_params('parent', 'preference', 'realtime', 'refresh', 'routing')
@@ -147,11 +172,10 @@ class FakeElasticsearch(Elasticsearch):
                   'track_scores', 'version')
     def search(self, index=None, doc_type=None, body=None, params=None):
         searchable_indexes = self._normalize_index_to_list(index)
-
         matches = []
         for searchable_index in searchable_indexes:
             for document in self.__documents_dict[searchable_index]:
-                if doc_type is not None and document.get('_type') != doc_type:
+                if doc_type is not None and document.get('_type') != doc_type and document.get('_type') not in doc_type:
                     continue
                 matches.append(document)
 
